@@ -9,9 +9,10 @@ const state = {
     expenses: [],
 };
 
-// Resident Data Structure
+// Resident Data Structure - Updated with 3 floors (18 rooms total)
 const rooms = [
     '101', '102', '103', '104', '105', '106',
+    '201', '202', '203', '204', '205', '206',
     '401', '402', '403', '404', '405', '406'
 ];
 
@@ -77,7 +78,9 @@ function showLoginPage() {
                     <strong>Demo Credentials:</strong><br>
                     Admin: admin / admin123<br>
                     Owner: owner@101 / owner123<br>
-                    (Room format: owner@RoomNo)
+                    (Room format: owner@RoomNo)<br><br>
+                    <strong>Available Rooms:</strong><br>
+                    101-106, 201-206, 401-406
                 </div>
                 
                 <form id="loginForm">
