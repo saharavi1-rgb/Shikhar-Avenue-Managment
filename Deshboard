@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Society Ledger & Expense Hub</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body class="bg-gray-100 font-sans min-h-screen flex flex-col">
+
+    <div id="login-interface" class="flex-grow flex flex-col items-center justify-center p-6">
+        <div class="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full border border-gray-100">
+            <div class="text-center mb-6">
+                <span class="text-5xl">🏢</span>
+                <h2 class="text-2xl font-bold text-gray-800 mt-2">Society Management Hub</h2>
+                <p class="text-gray-400 text-xs mt-1">Transparency & Operations Dashboard</p>
+            </div>
+
+            <form onsubmit="handleLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Account ID</label>
+                    <input type="text" id="username" required placeholder="admin or room101" 
+                           class="w-full px-4 py-2 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Password</label>
+                    <input type="password" id="password" required placeholder="••••••••" 
+                           class="w-full px-4 py-2 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                </div>
+
+                <div id="error-message" class="text-red-500 text-xs font-medium hidden text-center">
+                    ❌ Authentication incorrect. Check room format (e.g., room101).
+                </div>
+
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold p-2.5 rounded-xl transition shadow">
+                    Sign In
+                </button>
+            </form>
+
+            <div class="relative flex py-4 items-center">
+                <div class="flex-grow border-t border-gray-200"></div>
+                <span class="flex-shrink mx-4 text-gray-400 text-xs uppercase tracking-wider font-semibold">Or View Open Records</span>
+                <div class="flex-grow border-t border-gray-200"></div>
+            </div>
+
+            <button onclick="launchPublicView()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-semibold p-2.5 rounded-xl transition shadow text-sm">
+                🌐 Enter Public Transparency Directory
+            </button>
+            
+            <div class="mt-4 p-2.5 bg-gray-50 rounded-xl text-[11px] text-gray-500 space-y-0.5 border">
+                <p>🔑 **Manager:** <span class="font-mono bg-white px-1 border rounded">admin</span> / <span class="font-mono bg-white px-1 border rounded">housing2026</span></p>
+                <p>🔑 **Resident:** <span class="font-mono bg-white px-1 border rounded">room101</span> / <span class="font-mono bg-white px-1 border rounded">tenant2026</span></p>
+            </div>
+        </div>
+    </div>
+
+
+    <div id="app-dashboard" class="hidden flex-col min-h-screen">
+        <nav class="bg-slate-900 p-4 text-white shadow-md">
+            <div class="container mx-auto flex justify-between items-center">
+                <h1 id="dashboard-main-title" class="text-lg font-bold">🏢 Housing Central Data System</h1>
+                <div class="flex items-center gap-4">
+                    <span id="badge-mode" class="px-3 py-1 rounded-lg text-xs font-bold bg-blue-600">Viewer</span>
+                    <button onclick="handleLogout()" class="text-xs bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-lg font-medium transition">Exit Portal</button>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container mx-auto p-6 flex-grow space-y-6">
+            
+            <div id="admin-expense-panel" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="bg-white p-5 rounded-xl shadow border border-blue-100">
+                    <h3 class="font-bold text-sm text-slate-800 mb-3 flex items-center gap-1">➕ Log Expense Record</h3>
+                    <form onsubmit="addExpenseItem(event)" class="space-y-3 text-xs">
+                        <div>
+                            <label class="block font-semibold text-gray-500 mb-1">Expense Description / Vendor</label>
+                            <input type="text" id="exp-desc" required placeholder="e.g., Lift Repairing Service" class="w-full p-2 border rounded-lg bg-gray-50 outline-none">
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block font-semibold text-gray-500 mb-1">Amount (INR)</label>
+                                <input type="number" id="exp-amount" required placeholder="5000" class="w-full p-2 border rounded-lg bg-gray-50 outline-none">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-gray-500 mb-1">Billing Category</label>
+                                <select id="exp-cat" class="w-full p-2 border rounded-lg bg-gray-50">
+                                    <option value="Maintenance">Maintenance</option>
+                                    <option value="Electricity">Electricity</option>
+                                    <option value="Security">Security</option>
+                                    <option value="Water/Plumbing">Water / Plumbing</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold p-2 rounded-lg transition shadow">
+                            Save Expense Item
+                        </button>
+                    </form>
+                </div>
+
+                <div class="lg:col-span-2 bg-white p-5 rounded-xl shadow border flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-center mb-3 border-b pb-2">
+                            <h3 class="font-bold text-sm text-slate-700">📋 Active Cash Flow Expenditure Log</h3>
+                            <button onclick="exportDataToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow flex items-center gap-1 transition">
+                                📥 Export Complete Database to Excel (.xlsx)
+                            </button>
+                        </div>
+                        <div class="overflow-y-auto max-h-[140px] text-xs">
+                            <table class="w-full text-left">
+                                <thead class="bg-gray-50 text-gray-400 uppercase font-mono text-[10px]">
+                                    <tr>
+                                        <th class="p-2">Date Stamp</th>
+                                        <th class="p-2">Category</th>
+                                        <th class="p-2">Description</th>
+                                        <th class="p-2 text-right">Debit Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="expense-table-rows" class="divide-y divide-gray-100">
+                                    </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="owner-entry-panel" class="hidden grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-white p-5 rounded-xl shadow border-t-4 border-emerald-600">
+                    <h3 class="font-bold text-gray-700 text-sm border-b pb-2 mb-3">✏️ Feed / Update Your Room Particulars</h3>
+                    <form onsubmit="saveResidentData(event)" class="grid grid-cols-2 gap-3 text-xs">
+                        <div class="col-span-2">
+                            <label class="block font-semibold text-gray-500 mb-1">Your Full Name</label>
+                            <input type="text" id="owner-name-input" required class="w-full p-2 border rounded-lg bg-gray-50 outline-none">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-gray-500 mb-1">Mobile Cell Number</label>
+                            <input type="tel" id="owner-mobile-input" required class="w-full p-2 border rounded-lg bg-gray-50 outline-none">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-gray-500 mb-1">Vehicle Tracking Plate No</label>
+                            <input type="text" id="owner-vehicle-input" required class="w-full p-2 border rounded-lg bg-gray-50 outline-none">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-gray-500 mb-1">Allotment Classification</label>
+                            <select id="owner-type-input" class="w-full p-2 border rounded-lg bg-gray-50">
+                                <option value="Owned / Self Occupied">Owned (Self Occupied)</option>
+                                <option value="Rented Unit">Rented Unit</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-gray-500 mb-1">Current Month Fee (Rs)</label>
+                            <input type="number" id="owner-current-fee" required class="w-full p-2 border rounded-lg bg-gray-50 outline-none">
+                        </div>
+                        <div class="col-span-2">
+                            <label class="block font-semibold text-red-500 mb-1">Accumulated Past Due Balance (Rs)</label>
+                            <input type="number" id="owner-due-fee" required class="w-full p-2 border rounded-lg bg-gray-50 outline-none">
+                        </div>
+                        <button type="submit" class="col-span-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold p-2 rounded-lg transition shadow">
+                            Save Records Update
+                        </button>
+                    </form>
+                </div>
+
+                <div class="bg-white p-5 rounded-xl shadow border flex flex-col justify-between">
+                    <div>
+                        <h3 class="font-bold text-gray-700 text-sm mb-2 border-b pb-2">🚨 Dispatch Society Complaint Note</h3>
+                        <form onsubmit="dispatchComplaint(event)" class="space-y-3 text-xs">
+                            <div>
+                                <label class="block font-semibold text-gray-500 mb-1">Select Issue Category</label>
+                                <select id="comp-cat" class="w-full p-2 border rounded-lg bg-gray-50">
+                                    <option value="Plumbing Issue">Plumbing Failure / Leakage</option>
+                                    <option value="Electrical Repair">Electrical / Lift System Halt</option>
+                                    <option value="Parking Encroachment">Parking Intrusion / Obstruction</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-gray-500 mb-1">Elaborate Descriptive Note</label>
+                                <textarea id="comp-text" rows="3" required placeholder="Type parameters of issue details..." class="w-full p-2 border rounded-lg bg-gray-50 outline-none"></textarea>
+                            </div>
+                            <button type="submit" class="bg-slate-800 text-white px-4 py-2 rounded-lg font-bold hover:bg-slate-900 transition">
+                                File Live Ticket
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-xl shadow border">
+                <h3 class="font-bold text-slate-800 text-sm mb-3 border-b pb-2">📢 Registered Complaint Communication Board</h3>
+                <div id="complaints-view-canvas" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+                    </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow border overflow-hidden">
+                <div class="bg-gray-50 px-5 py-4 border-b border-gray-200 flex flex-wrap justify-between items-center gap-2">
+                    <h3 class="font-bold text-sm text-slate-800">🌐 Public Transparency Registry (All Floors Directory)</h3>
+                    <span class="text-[11px] font-medium text-gray-400 font-mono">Real-time Consolidated Ledger Node</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200 text-xs text-left">
+                        <thead class="bg-gray-50 text-gray-500 uppercase font-bold">
+                            <tr>
+                                <th class="p-3">Unit Code</th>
+                                <th class="p-3">Classification</th>
+                                <th class="p-3">Resident Name</th>
+                                <th class="p-3">Mobile No</th>
+                                <th class="p-3">Vehicle Plate</th>
+                                <th class="p-3 text-right">Current Month Fee</th>
+                                <th class="p-3 text-right">Past Arrears Due</th>
+                                <th class="p-3 text-right">Gross Total Due</th>
+                            </tr>
+                        </thead>
+                        <tbody id="public-directory-rows" class="divide-y divide-gray-100 bg-white">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        let dataStore = [];
+        let complaintsStore = [];
+        let internalExpenses = [];
+        let currentSessionRole = "Public"; 
+        let currentSessionUserNode = null; 
+
+        function runStartupDatabase() {
+            if (dataStore.length > 0) return;
+
+            const names = ["Alice Vance", "Mark R.", "Carlos Mendez", "Ji-Young Kim", "Tom Henderson", "Sarah Jenkins", "Michael Chang", "David Ross", "Emily Blunt", "James Smith"];
+            const classes = ["Owned / Self Occupied", "Rented Unit", "Owned / Self Occupied"];
+            
+            const floors = [1, 2, 3, 4];
+            const units = [1, 2, 3, 4, 5, 6];
+
+            floors.forEach(floor => {
+                units.forEach(unit => {
+                    const roomNum = (floor * 100) + unit;
+                    let isVacant = (roomNum === 102 || roomNum === 205 || roomNum === 303 || roomNum === 401);
+                    
+                    let calcCurrent = isVacant ? 0 : 1500;
+                    let calcPastDue = isVacant ? 0 : (roomNum % 4 === 0 ? 3000 : 0);
+
+                    dataStore.push({
+                        room: roomNum,
+                        type: isVacant ? "Unassigned Vacant" : classes[roomNum % classes.length],
+                        tenant: isVacant ? "Vacant Ledger Space" : names[roomNum % names.length],
+                        mobile: isVacant ? "—" : `+91 98765-00${roomNum}`,
+                        plate: isVacant ? "—" : `MH-12-QE-${2000 + roomNum}`,
+                        currentMonthAmount: calcCurrent,
+                        dueAmount: calcPastDue,
+                        isVacant: isVacant
+                    });
+                });
+            });
+
+            // Initial mock items for presentation metrics
+            internalExpenses = [
+                { date: "12-Jun-2026", category: "Security", desc: "Guard Staff Monthly Remittance", amount: 12000 },
+                { date: "14-Jun-2026", category: "Water/Plumbing", desc: "Tank Cleaning & Sanitization Service", amount: 3500 }
+            ];
+
+            complaintsStore = [
+                { room: 105, category: "Plumbing Issue", text: "Water seepage noticed from external firewall structure." },
+                { room: 403, category: "Parking Encroachment", text: "Visitor parking slot delivery box blocking room access zone." }
+            ];
+        }
+
+        function handleLogin(event) {
+            event.preventDefault();
+            const u = document.getElementById('username').value.trim().toLowerCase();
+            const p = document.getElementById('password').value;
+
+            runStartupDatabase();
+
+            if (u === "admin" && p === "housing2026") {
+                currentSessionRole = "Admin";
+                launchDashboardLayout();
+                return;
+            }
+
+            const match = u.match(/^room([1-4]0[1-6])$/);
+            if (match && p === "tenant2026") {
+                const num = parseInt(match[1]);
+                const matchNode = dataStore.find(r => r.room === num);
+                
+                if (matchNode) {
+                    currentSessionRole = "Owner";
+                    currentSessionUserNode = matchNode;
+                    launchDashboardLayout();
+                    return;
+                }
+            }
+            document.getElementById('error-message').classList.remove('hidden');
+        }
+
+        function launchPublicView() {
+            runStartupDatabase();
+            currentSessionRole = "Public";
+            currentSessionUserNode = null;
+            launchDashboardLayout();
+        }
+
+        function launchDashboardLayout() {
+            document.getElementById('login-interface').style.display = 'none';
+            document.getElementById('app-dashboard').classList.replace('hidden', 'flex');
+
+            // Set contextual title badges dynamically
+            const title = document.getElementById('dashboard-main-title');
+            const badge = document.getElementById('badge-mode');
+            
+            // Context Panel Visibility Switches
+            document.getElementById('admin-expense-panel').classList.add('hidden');
+            document.getElementById('owner-entry-panel').classList.add('hidden');
+
+            if (currentSessionRole === "Admin") {
+                title.innerText = "🏢 Management Master Console Operations";
+                badge.innerText = "Admin Account Access";
+                badge.className = "px-3 py-1 rounded-lg text-xs font-bold bg-purple-600 text-white";
+                document.getElementById('admin-expense-panel').classList.remove('hidden');
+                renderExpenses();
+            } else if (currentSessionRole === "Owner") {
+                title.innerText = `🔑 Resident Command Portal — Room ${currentSessionUserNode.room}`;
+                badge.innerText = `Room ${currentSessionUserNode.room} Owner`;
+                badge.className = "px-3 py-1 rounded-lg text-xs font-bold bg-emerald-600 text-white";
+                document.getElementById('owner-entry-panel').classList.remove('hidden');
+                populateOwnerForms();
+            } else {
+                title.innerText = "🌐 Society Public Directory Terminal";
+                badge.innerText = "Public Transparency Access Mode";
+                badge.className = "px-3 py-1 rounded-lg text-xs font-bold bg-gray-500 text-white";
+            }
+
+            renderPublicDirectory();
+            renderComplaintsCanvas();
+        }
+
+        function populateOwnerForms() {
+            if (!currentSessionUserNode) return;
+            document.getElementById('owner-name-input').value = currentSessionUserNode.tenant;
+            document.getElementById('owner-mobile-input').value = currentSessionUserNode.mobile;
+            document.getElementById('owner-vehicle-input').value = currentSessionUserNode.plate;
+            document.getElementById('owner-type-input').value = currentSessionUserNode.type;
+            document.getElementById('owner-current-fee').value = currentSessionUserNode.currentMonthAmount;
+            document.getElementById('owner-due-fee').value = currentSessionUserNode.dueAmount;
+        }
+
+        function saveResidentData(event) {
+            event.preventDefault();
+            if (!currentSessionUserNode) return;
+
+            currentSessionUserNode.tenant = document.getElementById('owner-name-input').value.trim();
+            currentSessionUserNode.mobile = document.getElementById('owner-mobile-input').value.trim();
+            currentSessionUserNode.plate = document.getElementById('owner-vehicle-input').value.trim();
+            currentSessionUserNode.type = document.getElementById('owner-type-input').value;
+            currentSessionUserNode.currentMonthAmount = parseFloat(document.getElementById('owner-current-fee').value) || 0;
+            currentSessionUserNode.dueAmount = parseFloat(document.getElementById('owner-due-fee').value) || 0;
+
+            alert("🎉 Your accounting particulars have been saved to the centralized directory ledger.");
+            renderPublicDirectory();
+        }
+
+        function dispatchComplaint(event) {
+            event.preventDefault();
+            const category = document.getElementById('comp-cat').value;
+            const message = document.getElementById('comp-text').value.trim();
+            const roomSource = currentSessionUserNode ? currentSessionUserNode.room : "Public Anon";
+
+            complaintsStore.unshift({
+                room: roomSource,
+                category: category,
+                text: message
+            });
+
+            document.getElementById('comp-text').value = "";
+            alert("🎯 Communication ticket transmitted instantly to the board logs.");
+            renderComplaintsCanvas();
+        }
+
+        function addExpenseItem(event) {
+            event.preventDefault();
+            const description = document.getElementById('exp-desc').value.trim();
+            const cost = parseFloat(document.getElementById('exp-amount').value) || 0;
+            const classification = document.getElementById('exp-cat').value;
+            
+            const today = new Date();
+            const dateStr = `${today.getDate()}-${today.toLocaleString('en-US', { month: 'short' })}-${today.getFullYear()}`;
+
+            internalExpenses.unshift({
+                date: dateStr,
+                category: classification,
+                desc: description,
+                amount: cost
+            });
+
+            document.getElementById('exp-desc').value = "";
+            document.getElementById('exp-amount').value = "";
+            
+            alert("⚡ Expense item compiled successfully.");
+            renderExpenses();
+        }
+
+        function renderExpenses() {
+            const container = document.getElementById('expense-table-rows');
+            container.innerHTML = "";
+            internalExpenses.forEach(row => {
+                container.innerHTML += `
+                    <tr class="hover:bg-gray-50">
+                        <td class="p-2 text-gray-500 font-mono">${row.date}</td>
+                        <td class="p-2 font-bold text-gray-600">${row.category}</td>
+                        <td class="p-2 text-gray-700">${row.desc}</td>
+                        <td class="p-2 text-right font-bold text-red-600 font-mono">- Rs ${row.amount.toLocaleString()}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        function renderComplaintsCanvas() {
+            const canvas = document.getElementById('complaints-view-canvas');
+            canvas.innerHTML = "";
+
+            if(complaintsStore.length === 0) {
+                canvas.innerHTML = `<p class="text-gray-400 italic">No tickets filed currently.</p>`;
+                return;
+            }
+
+            complaintsStore.forEach(item => {
+                canvas.innerHTML += `
+                    <div class="p-4 rounded-xl border bg-slate-50 flex flex-col justify-between">
+                        <div>
+                            <div class="flex justify-between font-bold mb-1">
+                                <span class="bg-slate-200 text-slate-700 px-2 py-0.5 rounded text-[10px]">Unit: ${item.room}</span>
+                                <span class="text-blue-600 text-[10px] uppercase">${item.category}</span>
+                            </div>
+                            <p class="text-gray-600 leading-relaxed font-medium mt-1">${item.text}</p>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function renderPublicDirectory() {
+            const tbody = document.getElementById('public-directory-rows');
+            tbody.innerHTML = "";
+
+            dataStore.forEach(row => {
+                const calculatedTotal = row.currentMonthAmount + row.dueAmount;
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50 transition border-b border-gray-100">
+                        <td class="p-3 font-extrabold text-slate-800">${row.room}</td>
+                        <td class="p-3 font-semibold text-gray-400 text-[11px]">${row.type}</td>
+                        <td class="p-3 font-bold text-slate-700">${row.tenant}</td>
+                        <td class="p-3 font-mono text-gray-500 text-xs">${row.mobile}</td>
+                        <td class="p-3 font-mono text-xs text-gray-500">${row.plate}</td>
+                        <td class="p-3 text-right font-bold text-gray-800 font-mono">Rs ${row.currentMonthAmount.toLocaleString()}</td>
+                        <td class="p-3 text-right font-bold text-red-500 font-mono">Rs ${row.dueAmount.toLocaleString()}</td>
+                        <td class="p-3 text-right font-black text-slate-900 font-mono bg-gray-50/50">Rs ${calculatedTotal.toLocaleString()}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        // ================= SHEETJS CORE INTEGRATION MODULE =================
+        function exportDataToExcel() {
+            if (currentSessionRole !== "Admin") return;
+
+            // 1. Map dynamic array payload data from core system memory
+            const compiledRoomRecordsRows = dataStore.map(item => ({
+                "Room Unit Number": item.room,
+                "Occupancy Matrix Classification": item.type,
+                "Registered Occupant Fullname": item.tenant,
+                "Mobile Connection Handle": item.mobile,
+                "Vehicle Registration Plate": item.plate,
+                "Current Active Month Assessment Fee (INR)": item.currentMonthAmount,
+                "Past Outstanding Arrears Due (INR)": item.dueAmount,
+                "Gross Account Balance Outstanding (INR)": (item.currentMonthAmount + item.dueAmount)
+            }));
+
+            const compiledExpenseRecordsRows = internalExpenses.map(item => ({
+                "Transaction Date-Stamp": item.date,
+                "Accounting Group Category": item.category,
+                "Item Operational Voucher Description": item.desc,
+                "Debited Outflow Cost (INR)": item.amount
+            }));
+
+            // 2. Initialize fresh
