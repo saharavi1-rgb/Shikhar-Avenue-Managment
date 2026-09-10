@@ -1,4 +1,5 @@
 // CMC Management System - Main Application
+// Note: Add this script tag to index.html: <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
 // State Management
 const state = {
@@ -7,7 +8,7 @@ const state = {
     residents: [],
     collections: [],
     expenses: [],
-    adminUPILink: '', // UPI link provided by admin
+    adminUPIQRCode: '', // UPI QR code data (Base64)
     monthlyBill: 0, // Monthly CMC bill amount
 };
 
@@ -37,7 +38,7 @@ function loadFromLocalStorage() {
         state.residents = data.residents || [];
         state.collections = data.collections || [];
         state.expenses = data.expenses || [];
-        state.adminUPILink = data.adminUPILink || '';
+        state.adminUPIQRCode = data.adminUPIQRCode || '';
         state.monthlyBill = data.monthlyBill || 0;
     }
 
@@ -69,9 +70,37 @@ function saveToLocalStorage() {
         residents: state.residents,
         collections: state.collections,
         expenses: state.expenses,
-        adminUPILink: state.adminUPILink,
+        adminUPIQRCode: state.adminUPIQRCode,
         monthlyBill: state.monthlyBill
     }));
+}
+
+// ==================== QR CODE GENERATION ====================
+function generateQRCode(upiString) {
+    return new Promise((resolve) => {
+        const qrCanvas = document.createElement('canvas');
+        const qr = new QRCode({
+            text: upiString,
+            width: 250,
+            height: 250,
+            correctLevel: QRCode.CorrectLevel.H,
+            foreground: '#000000',
+            background: '#ffffff',
+            useSVG: false
+        });
+        qr.makeCode();
+        const img = qr._el.querySelector('img');
+        if (img) {
+            resolve(img.src);
+        } else {
+            resolve('');
+        }
+    });
+}
+
+function generateQRCodeDataURL(text) {
+    // Using a simple QR code API for generating QR codes
+    return `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(text)}`;
 }
 
 // ==================== LOGIN PAGE ====================
@@ -397,11 +426,19 @@ function getAdminDashboard() {
                     <h2>⚙️ Admin Settings</h2>
                     <form id="adminSettingsForm">
                         <div class="form-group">
-                            <label>UPI Payment Link</label>
-                            <input type="text" id="upiLink" value="${state.adminUPILink}" placeholder="e.g., upi://pay?pa=admin@upi">
-                            <small>This link will be provided to owners for making payments</small>
+                            <label>UPI Payment Details</label>
+                            <input type="text" id="upiString" value="" placeholder="e.g., upi://pay?pa=admin@upi&pn=Admin&am=100">
+                            <small>Enter complete UPI string for QR code generation. Example: upi://pay?pa=admin@upi&pn=CMC Admin&am=500</small>
                         </div>
-                        <div class="form-group">
+                        <button type="button" class="btn btn-success" onclick="generateAndDisplayQRCode()">Generate QR Code</button>
+                        
+                        <div id="qrPreview" style="margin-top: 2rem; text-align: center; display: none;">
+                            <h4>QR Code Preview:</h4>
+                            <div id="qrCodeDisplay" style="display: inline-block; padding: 1rem; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);"></div>
+                            <p style="margin-top: 1rem; color: #7f8c8d;"><small>This QR code will be displayed to residents for payment</small></p>
+                        </div>
+                        
+                        <div class="form-group" style="margin-top: 2rem;">
                             <label>Monthly CMC Bill Amount (₹)</label>
                             <input type="number" id="monthlyBill" value="${state.monthlyBill}" min="0" required>
                             <small>This amount will be used to calculate outstanding bills</small>
@@ -545,17 +582,18 @@ function getOwnerDashboard() {
             <div id="payments" class="page">
                 <h2>💳 My Payment History</h2>
                 
-                ${state.adminUPILink ? `
+                ${state.adminUPIQRCode ? `
                     <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; margin-bottom: 2rem;">
-                        <h3 style="margin-top: 0;">🔗 Pay Monthly CMC Bill</h3>
-                        <p>Click below to pay your monthly CMC bill via UPI</p>
-                        <a href="${state.adminUPILink}" class="btn" style="background: white; color: #667eea; display: inline-block; margin-top: 1rem;">
-                            📱 Pay via UPI
-                        </a>
+                        <h3 style="margin-top: 0;">📱 Pay Monthly CMC Bill via QR Code</h3>
+                        <p>Scan the QR code below using any UPI app to pay</p>
+                        <div style="text-align: center; margin: 2rem 0;">
+                            <img src="${state.adminUPIQRCode}" alt="UPI QR Code" style="max-width: 250px; width: 100%; border-radius: 8px; background: white; padding: 1rem; box-sizing: border-box;">
+                        </div>
+                        <p style="font-size: 0.9rem; opacity: 0.9;">You can also save this image and use it to make payments</p>
                     </div>
                 ` : `
                     <div class="alert alert-info">
-                        UPI payment link is not yet configured by the admin.
+                        QR code for payment is not yet configured by the admin. Please check back later.
                     </div>
                 `}
 
@@ -614,8 +652,8 @@ function getOwnerDashboard() {
                         <div style="margin-top: 2rem; padding: 1.5rem; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
                             <h4 style="margin-top: 0;">⚠️ Payment Reminder</h4>
                             <p>You have an outstanding balance of <strong>₹${outstanding}</strong>. Please clear your dues at the earliest.</p>
-                            ${state.adminUPILink ? `
-                                <a href="${state.adminUPILink}" class="btn btn-primary">📱 Pay via UPI</a>
+                            ${state.adminUPIQRCode ? `
+                                <p style="margin-top: 1rem; font-weight: bold;">Scan the QR code in the Payments section to pay now</p>
                             ` : ''}
                         </div>
                     ` : `
@@ -695,7 +733,7 @@ function getModals() {
                             <option value="Cheque">Cheque</option>
                             <option value="Online">Online Transfer</option>
                             <option value="Card">Card</option>
-                            <option value="UPI">UPI</option>
+                            <option value="QR Code">QR Code</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -873,6 +911,26 @@ function openUpdateBillModal() {
     openModal('billModal');
 }
 
+// ==================== QR CODE GENERATION ====================
+function generateAndDisplayQRCode() {
+    const upiString = document.getElementById('upiString').value;
+    
+    if (!upiString) {
+        showAlert('Please enter UPI payment details', 'danger');
+        return;
+    }
+
+    const qrCodeURL = generateQRCodeDataURL(upiString);
+    const qrPreview = document.getElementById('qrPreview');
+    const qrDisplay = document.getElementById('qrCodeDisplay');
+    
+    qrDisplay.innerHTML = `<img src="${qrCodeURL}" alt="UPI QR Code" style="width: 250px; height: 250px;">`;
+    qrPreview.style.display = 'block';
+    
+    // Store the QR code URL
+    state.adminUPIQRCode = qrCodeURL;
+}
+
 // ==================== FORM SUBMISSION ====================
 function saveResident(e) {
     e.preventDefault();
@@ -948,7 +1006,6 @@ function saveExpense(e) {
 
 function saveAdminSettings(e) {
     e.preventDefault();
-    state.adminUPILink = document.getElementById('upiLink').value;
     state.monthlyBill = parseFloat(document.getElementById('monthlyBill').value);
     saveToLocalStorage();
     showAlert('Settings saved successfully!', 'success');
