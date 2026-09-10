@@ -7,6 +7,8 @@ const state = {
     residents: [],
     collections: [],
     expenses: [],
+    adminUPILink: '', // UPI link provided by admin
+    monthlyBill: 0, // Monthly CMC bill amount
 };
 
 // Resident Data Structure - Updated with 4 floors (24 rooms total)
@@ -35,6 +37,8 @@ function loadFromLocalStorage() {
         state.residents = data.residents || [];
         state.collections = data.collections || [];
         state.expenses = data.expenses || [];
+        state.adminUPILink = data.adminUPILink || '';
+        state.monthlyBill = data.monthlyBill || 0;
     }
 
     const user = localStorage.getItem('currentUser');
@@ -64,7 +68,9 @@ function saveToLocalStorage() {
     localStorage.setItem('cmcData', JSON.stringify({
         residents: state.residents,
         collections: state.collections,
-        expenses: state.expenses
+        expenses: state.expenses,
+        adminUPILink: state.adminUPILink,
+        monthlyBill: state.monthlyBill
     }));
 }
 
@@ -158,6 +164,8 @@ function getAdminDashboard() {
                 <a class="nav-link" data-page="residents">Residents</a>
                 <a class="nav-link" data-page="collections">Collections</a>
                 <a class="nav-link" data-page="expenses">Expenses</a>
+                <a class="nav-link" data-page="outstanding">Outstanding</a>
+                <a class="nav-link" data-page="settings">Settings</a>
                 <a class="nav-link" data-page="public">Public View</a>
                 <button class="logout-btn" onclick="logout()">Logout</button>
             </div>
@@ -334,6 +342,75 @@ function getAdminDashboard() {
                 </div>
             </div>
 
+            <!-- Outstanding Page -->
+            <div id="outstanding" class="page">
+                <h2>📊 Outstanding Amount by Room</h2>
+                <button class="btn btn-primary" style="margin-bottom: 1rem;" onclick="openUpdateBillModal()">
+                    ⚙️ Set Monthly Bill Amount
+                </button>
+
+                <div class="card">
+                    <p><strong>Current Monthly Bill: ₹${state.monthlyBill}</strong></p>
+                </div>
+
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Room</th>
+                                <th>Owner Name</th>
+                                <th>Months Outstanding</th>
+                                <th>Amount Due</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${state.residents.map(r => {
+                                const roomCollections = state.collections.filter(c => c.room === r.room);
+                                const totalPaid = roomCollections.reduce((sum, c) => sum + c.amount, 0);
+                                // Assuming 12 months with monthly bill
+                                const expectedAmount = state.monthlyBill * 12;
+                                const outstanding = Math.max(0, expectedAmount - totalPaid);
+                                const monthsOutstanding = state.monthlyBill > 0 ? Math.ceil(outstanding / state.monthlyBill) : 0;
+                                return `
+                                    <tr>
+                                        <td><strong>${r.room}</strong></td>
+                                        <td>${r.ownerName || '-'}</td>
+                                        <td>${monthsOutstanding}</td>
+                                        <td>₹${outstanding}</td>
+                                        <td>
+                                            ${outstanding > 0 
+                                                ? `<span class="badge badge-danger">₹${outstanding}</span>` 
+                                                : '<span class="badge badge-success">✓ Clear</span>'}
+                                        </td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Settings Page -->
+            <div id="settings" class="page">
+                <div class="card">
+                    <h2>⚙️ Admin Settings</h2>
+                    <form id="adminSettingsForm">
+                        <div class="form-group">
+                            <label>UPI Payment Link</label>
+                            <input type="text" id="upiLink" value="${state.adminUPILink}" placeholder="e.g., upi://pay?pa=admin@upi">
+                            <small>This link will be provided to owners for making payments</small>
+                        </div>
+                        <div class="form-group">
+                            <label>Monthly CMC Bill Amount (₹)</label>
+                            <input type="number" id="monthlyBill" value="${state.monthlyBill}" min="0" required>
+                            <small>This amount will be used to calculate outstanding bills</small>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Settings</button>
+                    </form>
+                </div>
+            </div>
+
             <!-- Public View Page -->
             <div id="public" class="page">
                 <h2>🔗 Public Collection Dashboard</h2>
@@ -360,6 +437,8 @@ function getOwnerDashboard() {
     const resident = state.residents.find(r => r.room === room);
     const roomCollections = state.collections.filter(c => c.room === room);
     const totalPaid = roomCollections.reduce((sum, c) => sum + c.amount, 0);
+    const expectedAmount = state.monthlyBill * 12;
+    const outstanding = Math.max(0, expectedAmount - totalPaid);
 
     return `
         <nav class="navbar">
@@ -368,6 +447,7 @@ function getOwnerDashboard() {
                 <a class="nav-link active" data-page="dashboard">Dashboard</a>
                 <a class="nav-link" data-page="profile">My Profile</a>
                 <a class="nav-link" data-page="payments">My Payments</a>
+                <a class="nav-link" data-page="outstanding">Outstanding</a>
                 <button class="logout-btn" onclick="logout()">Logout</button>
             </div>
         </nav>
@@ -387,6 +467,10 @@ function getOwnerDashboard() {
                     <div class="stat-card">
                         <h3>Total Paid</h3>
                         <div class="value">₹${totalPaid}</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Outstanding Amount</h3>
+                        <div class="value" style="color: ${outstanding > 0 ? 'var(--danger)' : 'var(--success)'};">₹${outstanding}</div>
                     </div>
                     <div class="stat-card">
                         <h3>Payment History</h3>
@@ -460,6 +544,21 @@ function getOwnerDashboard() {
             <!-- Payments Page -->
             <div id="payments" class="page">
                 <h2>💳 My Payment History</h2>
+                
+                ${state.adminUPILink ? `
+                    <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; margin-bottom: 2rem;">
+                        <h3 style="margin-top: 0;">🔗 Pay Monthly CMC Bill</h3>
+                        <p>Click below to pay your monthly CMC bill via UPI</p>
+                        <a href="${state.adminUPILink}" class="btn" style="background: white; color: #667eea; display: inline-block; margin-top: 1rem;">
+                            📱 Pay via UPI
+                        </a>
+                    </div>
+                ` : `
+                    <div class="alert alert-info">
+                        UPI payment link is not yet configured by the admin.
+                    </div>
+                `}
+
                 <div class="table-responsive">
                     <table>
                         <thead>
@@ -481,6 +580,50 @@ function getOwnerDashboard() {
                             `).join('')}
                         </tbody>
                     </table>
+                </div>
+            </div>
+
+            <!-- Outstanding Page -->
+            <div id="outstanding" class="page">
+                <div class="card">
+                    <h2>💰 Outstanding Amount Details</h2>
+                    
+                    <div class="grid">
+                        <div class="stat-card">
+                            <h3>Monthly Bill</h3>
+                            <div class="value">₹${state.monthlyBill}</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Total Paid</h3>
+                            <div class="value">₹${totalPaid}</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Amount Due</h3>
+                            <div class="value" style="color: ${outstanding > 0 ? 'var(--danger)' : 'var(--success)'};">₹${outstanding}</div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 2rem; padding: 1.5rem; background: #f8f9fa; border-radius: 8px;">
+                        <h4>📊 Payment Summary</h4>
+                        <p><strong>Expected Amount (12 months):</strong> ₹${expectedAmount}</p>
+                        <p><strong>Amount Paid:</strong> ₹${totalPaid}</p>
+                        <p><strong>Amount Outstanding:</strong> <span style="color: ${outstanding > 0 ? 'var(--danger)' : 'var(--success)'}; font-weight: bold;">₹${outstanding}</span></p>
+                    </div>
+
+                    ${outstanding > 0 ? `
+                        <div style="margin-top: 2rem; padding: 1.5rem; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+                            <h4 style="margin-top: 0;">⚠️ Payment Reminder</h4>
+                            <p>You have an outstanding balance of <strong>₹${outstanding}</strong>. Please clear your dues at the earliest.</p>
+                            ${state.adminUPILink ? `
+                                <a href="${state.adminUPILink}" class="btn btn-primary">📱 Pay via UPI</a>
+                            ` : ''}
+                        </div>
+                    ` : `
+                        <div style="margin-top: 2rem; padding: 1.5rem; background: #d4edda; border-left: 4px solid #28a745; border-radius: 4px;">
+                            <h4 style="margin-top: 0;">✓ All Clear</h4>
+                            <p>Thank you! Your account is up to date with no outstanding balance.</p>
+                        </div>
+                    `}
                 </div>
             </div>
         </div>
@@ -552,6 +695,7 @@ function getModals() {
                             <option value="Cheque">Cheque</option>
                             <option value="Online">Online Transfer</option>
                             <option value="Card">Card</option>
+                            <option value="UPI">UPI</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -602,6 +746,24 @@ function getModals() {
                 </form>
             </div>
         </div>
+
+        <!-- Update Bill Modal -->
+        <div id="billModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Set Monthly Bill Amount</h2>
+                    <button class="close-btn" onclick="closeModal('billModal')">×</button>
+                </div>
+                <form id="billForm">
+                    <div class="form-group">
+                        <label>Monthly CMC Bill Amount (₹)</label>
+                        <input type="number" id="billAmount" value="${state.monthlyBill}" min="0" required>
+                        <small>This will be used to calculate outstanding amounts for all residents</small>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Update Amount</button>
+                </form>
+            </div>
+        </div>
     `;
 }
 
@@ -636,6 +798,16 @@ function setupEventListeners() {
     const profileForm = document.getElementById('profileForm');
     if (profileForm) {
         profileForm.addEventListener('submit', saveOwnerProfile);
+    }
+
+    const adminSettingsForm = document.getElementById('adminSettingsForm');
+    if (adminSettingsForm) {
+        adminSettingsForm.addEventListener('submit', saveAdminSettings);
+    }
+
+    const billForm = document.getElementById('billForm');
+    if (billForm) {
+        billForm.addEventListener('submit', saveMonthlyBill);
     }
 
     // Set today's date as default
@@ -694,6 +866,11 @@ function openAddExpenseModal() {
     document.getElementById('expenseForm').reset();
     document.getElementById('expenseDate').value = new Date().toISOString().split('T')[0];
     openModal('expenseModal');
+}
+
+function openUpdateBillModal() {
+    document.getElementById('billAmount').value = state.monthlyBill;
+    openModal('billModal');
 }
 
 // ==================== FORM SUBMISSION ====================
@@ -766,6 +943,24 @@ function saveExpense(e) {
     saveToLocalStorage();
     showAlert('Expense added successfully!', 'success');
     closeModal('expenseModal');
+    showDashboard();
+}
+
+function saveAdminSettings(e) {
+    e.preventDefault();
+    state.adminUPILink = document.getElementById('upiLink').value;
+    state.monthlyBill = parseFloat(document.getElementById('monthlyBill').value);
+    saveToLocalStorage();
+    showAlert('Settings saved successfully!', 'success');
+    showDashboard();
+}
+
+function saveMonthlyBill(e) {
+    e.preventDefault();
+    state.monthlyBill = parseFloat(document.getElementById('billAmount').value);
+    saveToLocalStorage();
+    showAlert('Monthly bill amount updated successfully!', 'success');
+    closeModal('billModal');
     showDashboard();
 }
 
