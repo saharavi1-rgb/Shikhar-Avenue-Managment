@@ -157,6 +157,7 @@ function getAdminDashboard() {
                 <a class="nav-link" data-page="residents">Residents</a>
                 <a class="nav-link" data-page="collections">Collections</a>
                 <a class="nav-link" data-page="expenses">Expenses</a>
+                <a class="nav-link" data-page="payments">Payment Links</a>
                 <a class="nav-link" data-page="public">Public View</a>
                 <button class="logout-btn" onclick="logout()">Logout</button>
             </div>
@@ -333,6 +334,38 @@ function getAdminDashboard() {
                 </div>
             </div>
 
+            <!-- Payment Links Page -->
+            <div id="payments" class="page">
+                <h2>💳 UPI Payment Configuration</h2>
+                <div class="card">
+                    <h3>Configure Society UPI for Payments</h3>
+                    <form id="upiConfigForm">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>UPI ID (e.g., societyname@upi)</label>
+                                <input type="text" id="upiId" placeholder="Enter UPI ID" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Payee Name</label>
+                                <input type="text" id="payeeName" placeholder="Enter payee name" value="Shikhar Avenue">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="upiActive">
+                                Enable UPI Payments
+                            </label>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save UPI Configuration</button>
+                    </form>
+                </div>
+
+                <div class="card" style="margin-top: 2rem;">
+                    <h3>📱 Payment Status</h3>
+                    <div id="upiStatus"></div>
+                </div>
+            </div>
+
             <!-- Public View Page -->
             <div id="public" class="page">
                 <h2>🔗 Public Collection Dashboard</h2>
@@ -416,6 +449,14 @@ function getOwnerDashboard() {
                         </table>
                     </div>
                 </div>
+
+                ${upiConfig.isConfigured() ? `
+                    <div class="card" style="margin-top: 2rem;">
+                        <h3>💳 Make a Payment</h3>
+                        <p>Click the button below to pay CMC charges via UPI:</p>
+                        ${upiConfig.generateUPIButton(5000, `CMC-Room${room}`)}
+                    </div>
+                ` : ''}
             </div>
 
             <!-- Profile Page -->
@@ -550,6 +591,7 @@ function getModals() {
                             <option value="Cash">Cash</option>
                             <option value="Cheque">Cheque</option>
                             <option value="Online">Online Transfer</option>
+                            <option value="UPI">UPI</option>
                             <option value="Card">Card</option>
                         </select>
                     </div>
@@ -612,6 +654,10 @@ function setupEventListeners() {
             const page = e.target.dataset.page;
             if (page) {
                 navigateToPage(page);
+                // Load UPI status when navigating to payment links page
+                if (page === 'payments' && state.userType === 'admin') {
+                    updateUPIStatus();
+                }
             }
         });
     });
@@ -635,6 +681,12 @@ function setupEventListeners() {
     const profileForm = document.getElementById('profileForm');
     if (profileForm) {
         profileForm.addEventListener('submit', saveOwnerProfile);
+    }
+
+    const upiConfigForm = document.getElementById('upiConfigForm');
+    if (upiConfigForm) {
+        upiConfigForm.addEventListener('submit', saveUPIConfig);
+        loadUPIConfig();
     }
 
     // Set today's date as default
@@ -766,6 +818,57 @@ function saveExpense(e) {
     showAlert('Expense added successfully!', 'success');
     closeModal('expenseModal');
     showDashboard();
+}
+
+// ==================== UPI PAYMENT FUNCTIONS ====================
+function loadUPIConfig() {
+    const settings = upiConfig.getSettings();
+    document.getElementById('upiId').value = settings.upiId;
+    document.getElementById('payeeName').value = settings.payeeName;
+    document.getElementById('upiActive').checked = settings.isActive;
+    updateUPIStatus();
+}
+
+function saveUPIConfig(e) {
+    e.preventDefault();
+    const upiId = document.getElementById('upiId').value;
+    const payeeName = document.getElementById('payeeName').value;
+    const isActive = document.getElementById('upiActive').checked;
+
+    if (!upiId.trim()) {
+        showAlert('Please enter a valid UPI ID', 'danger');
+        return;
+    }
+
+    upiConfig.updateSettings(upiId, payeeName, isActive);
+    showAlert('UPI configuration saved successfully!', 'success');
+    updateUPIStatus();
+}
+
+function updateUPIStatus() {
+    const statusDiv = document.getElementById('upiStatus');
+    if (!statusDiv) return;
+
+    const settings = upiConfig.getSettings();
+    
+    if (settings.isActive && settings.upiId) {
+        statusDiv.innerHTML = `
+            <div class="alert alert-success show">
+                <strong>✓ UPI Payment Enabled</strong><br>
+                UPI ID: <strong>${settings.upiId}</strong><br>
+                Payee Name: <strong>${settings.payeeName}</strong><br>
+                <br>
+                Residents can now make payments via UPI. Payment links will be available on their dashboard.
+            </div>
+        `;
+    } else {
+        statusDiv.innerHTML = `
+            <div class="alert alert-warning show">
+                <strong>⚠ UPI Payment Disabled</strong><br>
+                Configure UPI settings above to enable payment links for residents.
+            </div>
+        `;
+    }
 }
 
 // ==================== DELETE FUNCTIONS ====================
